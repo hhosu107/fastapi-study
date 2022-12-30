@@ -1,0 +1,39 @@
+name: Publish
+
+on:
+  push:
+    branches:
+    - main
+    tags:
+    - '*.*.*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Build image
+      run: docker build -t fastapi-study .
+    - name: Login to the GitHub container registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+    - name: Extract metadata
+      id: image-metadata
+      run: |
+        NAME="ghcr.io/${GITHUB_REPOSITORY}"
+        TAG="${GITHUB_REF#refs/*/}"
+        if [ "$TAG" = "main" ]; then
+          TAG="latest"
+        fi
+        echo "name=${NAME}" >> $GITHUB_OUTPUT
+        echo "tag=${TAG}" >> $GITHUB_OUTPUT
+    - name: Push image
+      env:
+        IMAGE_NAME: ${{ steps.image-metadata.outputs.name }}
+        IMAGE_TAG: ${{ steps.image-metadata.outputs.tag }}
+      run: |
+        docker tag fastapi-study ${IMAGE_NAME}:${IMAGE_TAG}
+        docker push ${IMAGE_NAME}:${IMAGE_TAG}
